@@ -1,0 +1,321 @@
+{
+	"info": {
+		"_postman_id": "831fc5da-3dee-4114-ba0e-76be195599cf",
+		"name": "Fake Store - E2E Order Flow",
+		"description": "**Description:**\n\nThis collection contains an end-to-end API testing scenario for Fake Store API, including user login, product listing, cart creation, and user cart retrieval. The tests use environment variables, dynamic data selection, and detailed validation scripts to ensure API correctness.\n\n**Usage Instructions:**\n\n- Import collection and environment files\n    \n- Set your user credentials (`username` and `password`) in the environment variables\n    \n- Manually set the `userId` variable in the environment, as the Fake Store API does not return it upon login\n    \n- StartFragmentEnsure the correct environment is selected before running requests.\n    \n- Run requests sequentially or with Postman Runner\n    \n- StartFragmentTest scripts automatically validate responses; results are visible and clear in Postman Runner.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "4490689"
+	},
+	"item": [
+		{
+			"name": "1. Login user",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let json;\r",
+							"try {\r",
+							"    json = pm.response.json();\r",
+							"} catch (e) {\r",
+							"    throw new Error(\"Response is not valid JSON\");\r",
+							"}\r",
+							"\r",
+							"let status = pm.response.code;\r",
+							"\r",
+							"if (status === 200) {\r",
+							" if (!json.token) {\r",
+							"        throw new Error(\"Token not found in successful login response\");\r",
+							"    }\r",
+							"    pm.environment.set(\"token\", json.token);\r",
+							"    pm.test(\"Login successful, token saved\", () => {\r",
+							"        pm.expect(json.token).to.be.a(\"string\").and.not.empty;\r",
+							"    });\r",
+							"} else if (status === 401) {\r",
+							"    pm.test(\"Login failed with 401 - Unauthorized\", function () {\r",
+							"        pm.expect(pm.response.code).to.eql(401);\r",
+							"        let json = pm.response.json();\r",
+							"        pm.expect(json).to.have.property(\"message\");\r",
+							"    });\r",
+							"} else {\r",
+							"    throw new Error(`Unexpected response code: ${status}`);\r",
+							"}"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/login",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2. Get product list",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let products = pm.response.json();\r",
+							"pm.test(\"Status code is 200\", () => {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response is an array\", () => {\r",
+							"    pm.expect(products).to.be.an(\"array\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Product list is not empty\", () => {\r",
+							"    pm.expect(products.length).to.be.above(0);\r",
+							"});\r",
+							"\r",
+							"let randomIndex = Math.floor(Math.random() * products.length);\r",
+							"let selectedProduct = products[randomIndex];\r",
+							"\r",
+							"pm.test(\"Selected product has id and title\", () => {\r",
+							"    pm.expect(selectedProduct).to.have.property(\"id\");\r",
+							"    pm.expect(selectedProduct).to.have.property(\"title\");\r",
+							"});\r",
+							"\r",
+							"pm.environment.set(\"productId\", selectedProduct.id);\r",
+							"pm.environment.set(\"productTitle\", selectedProduct.title);\r",
+							"\r",
+							"console.log(`Selected product: ${selectedProduct.title} (ID: ${selectedProduct.id})`);"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/products",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"products"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3. Create cart",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let json = pm.response.json();\r",
+							"let userId = parseInt(pm.environment.get(\"userId\"));\r",
+							"let productId = parseInt(pm.environment.get(\"productId\"));\r",
+							"let quantity = parseInt(pm.environment.get(\"quantity\"));\r",
+							"let productTitle = pm.environment.get(\"productTitle\");\r",
+							"\r",
+							"console.log(`Checking cart for product: ${productTitle} (ID: ${productId})`);\r",
+							"\r",
+							"pm.test(\"Status is 200 or 201\", () => {\r",
+							"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Cart contains correct userId\", () => {\r",
+							"    pm.expect(json.userId).to.eql(userId);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Cart includes selected product with correct quantity\", () => {\r",
+							"    pm.expect(json.products, \"No products in cart response\").to.be.an(\"array\").that.is.not.empty;\r",
+							"\r",
+							"    const found = json.products.find(p =>\r",
+							"        p.productId === productId && p.quantity === quantity\r",
+							"    );\r",
+							"\r",
+							"    pm.expect(found, `Expected product (${productId}) not found with quantity ${quantity}`).to.exist;\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"let today = new Date().toISOString().split('T')[0];\r",
+							"pm.environment.set(\"today\", today);\r",
+							"\r",
+							"let randomQuantity = Math.floor(Math.random() * 10) + 1;\r",
+							"pm.environment.set(\"quantity\", randomQuantity);\r",
+							"\r",
+							"console.log(`Random quantity set to: ${randomQuantity}`);"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"userId\": {{userId}},\n  \"date\": \"{{today}}\",\n  \"products\": [\n    {\n      \"productId\": {{productId}},\n      \"quantity\": {{quantity}}\n    }\n  ]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/carts",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"carts"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "4.  Get user cart",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let json = pm.response.json();\r",
+							"\r",
+							"pm.test(\"Status code is 200\", () => {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response is a non-empty array\", () => {\r",
+							"    pm.expect(json).to.be.an(\"array\").that.is.not.empty;\r",
+							"});\r",
+							"\r",
+							"json.forEach(cart => {\r",
+							"    pm.test(`Cart ID ${cart.id} is a positive number`, () => {\r",
+							"        pm.expect(cart.id).to.be.a(\"number\").and.to.be.above(0);\r",
+							"    });\r",
+							"    \r",
+							"    pm.test(`Cart date ${cart.date} is a valid ISO date string`, () => {\r",
+							"    pm.expect(Date.parse(cart.date)).to.be.a('number');\r",
+							"    });\r",
+							"\r",
+							"    pm.test(`Cart ${cart.id} has a non-empty products array`, () => {\r",
+							"        pm.expect(cart.products).to.be.an(\"array\").that.is.not.empty;\r",
+							"    });\r",
+							"\r",
+							"    cart.products.forEach(product => {\r",
+							"        pm.test(`Product ID ${product.productId} in cart ${cart.id} is a positive number`, () => {\r",
+							"            pm.expect(product.productId).to.be.a(\"number\").and.to.be.above(0);\r",
+							"        });\r",
+							"\r",
+							"        pm.test(`Quantity for product ${product.productId} in cart ${cart.id} is a positive number`, () => {\r",
+							"            pm.expect(product.quantity).to.be.a(\"number\").and.to.be.above(0);\r",
+							"        });\r",
+							"    });\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/carts/user/{{userId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"carts",
+						"user",
+						"{{userId}}"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
